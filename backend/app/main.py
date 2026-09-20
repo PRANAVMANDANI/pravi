@@ -13,11 +13,20 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def startup_event():
+    try:
+        from app.seed import seed_data
+        seed_data()
+    except Exception as e:
+        print(f"⚠️ Startup database seeding warning: {e}")
 
 # Register routers
 app.include_router(auth.router)
