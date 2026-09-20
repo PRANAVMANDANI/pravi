@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: pravi_id_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pravi_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pravi_secret_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-pravi_id}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pravi_admin}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pravi_id_backend
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-pravi_admin}:${POSTGRES_PASSWORD:-pravi_secret_2026}@postgres:5432/${POSTGRES_DB:-pravi_id}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "alembic upgrade head && python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pravi_id_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+
+volumes:
+  postgres_data:
